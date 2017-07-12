@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Windows.Forms;
+using Jil;
 
 namespace WindowsLayoutSnapshot
 {
@@ -11,6 +12,8 @@ namespace WindowsLayoutSnapshot
         [STAThread]
         public static void Main()
         {
+            JSON.SetDefaultOptions(Options.ISO8601CamelCase);
+            
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new TrayIconForm());
