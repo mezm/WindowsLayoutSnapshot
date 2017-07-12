@@ -11,18 +11,12 @@ namespace WindowsLayoutSnapshot.Persistence
     public sealed class FileSnapshotStorage : ISnapshotStorage, IDisposable
     {
         public const string SnapshotsFilename = "snapshots.json";
+        public const string BrokenFilenameTemplate = "snapshots-{0}.json.bak";
 
         private readonly Lazy<ConcurrentDictionary<Guid, Snapshot>> _snapshots = new Lazy<ConcurrentDictionary<Guid, Snapshot>>(RestoreState);
         private readonly ActionBlock<Snapshot[]> _persistBlock = new ActionBlock<Snapshot[]>(x => PersistState(x));
         
-        private Snapshot[] CurrentState => _snapshots.Value.Select(x => x.Value).OrderBy(x => x.TimeTaken).ToArray(); // avoid global lock
-        
-        public Task<Snapshot[]> GetAllSnapshots()
-        {
-            //Interlocked.Exchange()
-            var snapshots = CurrentState;
-            return Task.FromResult(snapshots);
-        }
+        public Snapshot[] AllSnapshots => _snapshots.Value.Select(x => x.Value).OrderBy(x => x.TimeTaken).ToArray(); // avoid global lock
 
         public Task AddSnapshot(Snapshot snapshot)
         {
@@ -60,17 +54,28 @@ namespace WindowsLayoutSnapshot.Persistence
             _persistBlock.Completion.Wait(TimeSpan.FromSeconds(5));
         }
 
-        private Task QueuePersist() => _persistBlock.SendAsync(CurrentState);
+        private Task QueuePersist() => _persistBlock.SendAsync(AllSnapshots);
 
         private static ConcurrentDictionary<Guid, Snapshot> RestoreState()
         {
             if (!File.Exists(SnapshotsFilename)) return new ConcurrentDictionary<Guid, Snapshot>();
 
-            using (var file = new FileStream(SnapshotsFilename, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var reader = new StreamReader(file))
+            try
             {
-                var snapshots = JSON.Deserialize<Snapshot[]>(reader);
-                return new ConcurrentDictionary<Guid, Snapshot>(snapshots.ToDictionary(x => x.Id));
+                using (var file = new FileStream(SnapshotsFilename, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var reader = new StreamReader(file))
+                {
+                    var snapshots = JSON.Deserialize<Snapshot[]>(reader);
+                    return new ConcurrentDictionary<Guid, Snapshot>(snapshots.ToDictionary(x => x.Id));
+                }
+            }
+            catch (Exception ex)
+            {
+                // todo: log exception
+                var backupFilename = string.Format(BrokenFilenameTemplate, DateTime.Now.ToString("yyyy-MM-dd_HH-mm"));
+                File.Copy(SnapshotsFilename, backupFilename);
+                File.Delete(SnapshotsFilename);
+                return new ConcurrentDictionary<Guid, Snapshot>();
             }
         }
 

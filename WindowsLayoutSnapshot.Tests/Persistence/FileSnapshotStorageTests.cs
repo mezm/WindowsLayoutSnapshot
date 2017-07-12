@@ -22,14 +22,27 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
             {
                 File.Delete(FileSnapshotStorage.SnapshotsFilename);
             }
+
+            var backups = Directory.GetFiles(Directory.GetCurrentDirectory()).Where(x => x.EndsWith(".bak"));
+            foreach (var backup in backups)
+            {
+                File.Delete(backup);
+            }
         }
 
         [Fact]
-        public async Task GetAllSnapshots_NoSnapshots_ShouldReturnEmptyArray()
-        {
-            var storages = await GetCurrentSnapshots();
+        public void GetAllSnapshots_NoSnapshots_ShouldReturnEmptyArray() => _storage.AllSnapshots.Should().BeEmpty();
 
-            storages.Should().BeEmpty();
+        [Fact]
+        public void GetAllSnapshots_StateFileBroken_ShouldReturnEmptyArrayAndRemoveFile()
+        {
+            File.WriteAllText(FileSnapshotStorage.SnapshotsFilename, @"{'a': 10}");
+
+            _storage.AllSnapshots.Should().BeEmpty();
+
+            _storage.Dispose();
+            File.Exists(FileSnapshotStorage.SnapshotsFilename).Should().BeFalse();
+            Directory.GetFiles(Directory.GetCurrentDirectory()).Should().Contain(x => x.EndsWith(".json.bak"));
         }
 
         [Fact]
@@ -39,8 +52,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
 
             await _storage.AddSnapshot(snapshot);
 
-            var snapshots = await GetCurrentSnapshots();
-            snapshots.Should().HaveCount(1).And.Contain(snapshot);
+            _storage.AllSnapshots.Should().HaveCount(1).And.Contain(snapshot);
         }
 
         [Fact]
@@ -54,8 +66,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
             await _storage.AddSnapshot(snapshot2);
             await _storage.AddSnapshot(snapshot3);
 
-            var snapshots = await GetCurrentSnapshots();
-            snapshots.Should().BeEquivalentTo(snapshot1, snapshot2, snapshot3);
+            _storage.AllSnapshots.Should().BeEquivalentTo(snapshot1, snapshot2, snapshot3);
         }
 
         [Fact]
@@ -65,9 +76,8 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
 
             await Task.WhenAll(snapshots.Select(x => _storage.AddSnapshot(x)));
 
-            var actualSnapshots = await GetCurrentSnapshots();
             // ReSharper disable once CoVariantArrayConversion
-            actualSnapshots.Should().BeEquivalentTo(snapshots);
+            _storage.AllSnapshots.Should().BeEquivalentTo(snapshots);
         }
 
         [Fact]
@@ -87,13 +97,24 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
 
             await Task.WhenAll(snapshots.Select(x => _storage.AddSnapshot(x)));
 
-            var restored = await GetRestoredSnapshots();
             // ReSharper disable once CoVariantArrayConversion
-            restored.Should().BeEquivalentTo(snapshots);
+            GetRestoredSnapshots().Should().BeEquivalentTo(snapshots);
             AssertSnapshotsFileExists();
         }
 
         [Fact]
+        public async Task AddSnapshot_StateFileBroken_ShouldReturnEmptyArrayAndRemoveFile()
+        {
+            File.WriteAllText(FileSnapshotStorage.SnapshotsFilename, @"{'a': 10}");
+
+            await _storage.AddSnapshot(new Snapshot(true));
+
+            _storage.Dispose();
+            File.Exists(FileSnapshotStorage.SnapshotsFilename).Should().BeTrue();
+            Directory.GetFiles(Directory.GetCurrentDirectory()).Should().Contain(x => x.EndsWith(".json.bak"));
+        }
+
+        [Fact]  
         public async Task RemoveSnapshot_SnapshotExists_ShouldRemoveOne()
         {
             var snapshot1 = new Snapshot(true);
@@ -106,8 +127,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
 
             await _storage.RemoveSnapshot(snapshot2);
 
-            var snapshots = await GetCurrentSnapshots();
-            snapshots.Should().BeEquivalentTo(snapshot1, snapshot3);
+            _storage.AllSnapshots.Should().BeEquivalentTo(snapshot1, snapshot3);
         }
 
         [Fact]
@@ -119,8 +139,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
             var removed = new[] { 3, 21, 12, 13, 7 }.Select(x => snapshots[x]).ToArray();
             await Task.WhenAll(removed.Select(x => _storage.RemoveSnapshot(x)));
 
-            var actualSnapshots = await GetCurrentSnapshots();
-            actualSnapshots.Should().BeEquivalentTo(snapshots.Except(removed));
+            _storage.AllSnapshots.Should().BeEquivalentTo(snapshots.Except(removed));
         }
 
         [Fact]
@@ -145,9 +164,8 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
 
             await _storage.RemoveSnapshot(snapshots[19]);
 
-            var restored = await GetRestoredSnapshots();
             // ReSharper disable once CoVariantArrayConversion
-            restored.Should().BeEquivalentTo(snapshots.Except(new[] { snapshots[19] }));
+            GetRestoredSnapshots().Should().BeEquivalentTo(snapshots.Except(new[] { snapshots[19] }));
             AssertSnapshotsFileExists();
         }
 
@@ -156,8 +174,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         {
             await _storage.Clear();
 
-            var snapshots = await GetCurrentSnapshots();
-            snapshots.Should().BeEmpty();
+            _storage.AllSnapshots.Should().BeEmpty();
         }
 
         [Fact]
@@ -168,8 +185,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
 
             await _storage.Clear();
 
-            var snapshots = await GetCurrentSnapshots();
-            snapshots.Should().BeEmpty();
+            _storage.AllSnapshots.Should().BeEmpty();
         }
 
         [Fact]
@@ -181,8 +197,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
 
             await _storage.Clear();
 
-            var restored = await GetRestoredSnapshots();
-            restored.Should().BeEmpty();
+            GetRestoredSnapshots().Should().BeEmpty();
         }
 
         [Fact]
@@ -199,27 +214,28 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
                 _storage.RemoveSnapshot(snapshots[18]));
 
             var expected = snapshots.Except(new[] { snapshots[1], snapshots[18] }).Concat(new[] { newSnapshot }).ToArray();
-            var actual = await GetCurrentSnapshots();
-            // ReSharper disable once CoVariantArrayConversion
-            actual.Should().BeEquivalentTo(expected);
-            
-            var restored = await GetRestoredSnapshots();
-            // ReSharper disable once CoVariantArrayConversion
-            restored.Should().BeEquivalentTo(restored);
+            // ReSharper disable CoVariantArrayConversion
+            _storage.AllSnapshots.Should().BeEquivalentTo(expected);
+            GetRestoredSnapshots().Should().BeEquivalentTo(expected);
+            // ReSharper restore CoVariantArrayConversion
         }
 
-        private Task<Snapshot[]> GetCurrentSnapshots() => _storage.GetAllSnapshots();
-
-        private Task<Snapshot[]> GetRestoredSnapshots()
+        [Fact]
+        public void AddSnapshot_UnableToPersist_ShouldThrow()
+        {
+            using (new FileStream(FileSnapshotStorage.SnapshotsFilename, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
+            {
+                _storage.Invoking(x => x.AddSnapshot(new Snapshot(true))).ShouldThrow<IOException>();
+            }
+        }
+        
+        private Snapshot[] GetRestoredSnapshots()
         {
             _storage.Dispose();
             _restoreStorage = new FileSnapshotStorage();
-            return _restoreStorage.GetAllSnapshots();
+            return _restoreStorage.AllSnapshots;
         }
 
         private static void AssertSnapshotsFileExists() => File.Exists(FileSnapshotStorage.SnapshotsFilename).Should().BeTrue();
-
-        // todo: broken file
-        // todo: first read from file
     }
 }
