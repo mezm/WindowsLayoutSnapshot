@@ -12,7 +12,7 @@ namespace WindowsLayoutSnapshot
         [STAThread]
         public static void Main()
         {
-            JSON.SetDefaultOptions(Options.ISO8601CamelCase);
+            JSON.SetDefaultOptions(Options.ISO8601PrettyPrintCamelCase);
             
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);

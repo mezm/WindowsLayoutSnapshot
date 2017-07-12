@@ -6,13 +6,14 @@ using System.Drawing.Imaging;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using WindowsLayoutSnapshot.Persistence;
 
 namespace WindowsLayoutSnapshot
 {
     public partial class TrayIconForm : Form
     {
         private readonly Timer m_snapshotTimer = new Timer();
-        private readonly List<Snapshot> m_snapshots = new List<Snapshot>();
+        private readonly ISnapshotStorage m_snapshots = new FileSnapshotStorage();
         private Snapshot m_menuShownSnapshot;
         private Padding? m_originalTrayMenuArrowPadding;
         private Padding? m_originalTrayMenuTextPadding;
@@ -45,7 +46,7 @@ namespace WindowsLayoutSnapshot
 
         private void TakeSnapshot(bool userInitiated)
         {
-            m_snapshots.Add(new Snapshot(userInitiated));
+            m_snapshots.AddSnapshot(new Snapshot(userInitiated));
             UpdateRestoreChoicesInMenu();
         }
 
@@ -117,7 +118,7 @@ namespace WindowsLayoutSnapshot
             // construct the new list of menu items, then populate them
             // this function is idempotent
 
-            var snapshotsOldestFirst = new List<Snapshot>(CondenseSnapshots(m_snapshots, 20));
+            var snapshotsOldestFirst = new List<Snapshot>(CondenseSnapshots(m_snapshots.AllSnapshots, 20));
             var newMenuItems = new List<ToolStripItem> { quitToolStripMenuItem, snapshotListEndLine };
             
             var maxNumMonitors = 0;

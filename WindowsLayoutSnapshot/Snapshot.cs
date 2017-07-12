@@ -55,10 +55,10 @@ namespace WindowsLayoutSnapshot
         }
 
         public Guid Id { get; protected set; } = Guid.NewGuid();
-        public DateTime TimeTaken { get; } = DateTime.UtcNow;
-        public bool UserInitiated { get; }
-        public long[] MonitorPixelCounts { get; }
-        public int NumMonitors { get; }
+        public DateTime TimeTaken { get; protected set; } = DateTime.UtcNow;
+        public bool UserInitiated { get; protected set; }
+        public long[] MonitorPixelCounts { get; protected set; }
+        public int NumMonitors { get; protected set; }
 
         public TimeSpan Age => DateTime.UtcNow.Subtract(TimeTaken);
 
