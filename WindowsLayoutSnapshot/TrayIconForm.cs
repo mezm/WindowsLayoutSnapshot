@@ -45,7 +45,7 @@ namespace WindowsLayoutSnapshot
 
         private void TakeSnapshot(bool userInitiated)
         {
-            m_snapshots.Add(Snapshot.TakeSnapshot(userInitiated));
+            m_snapshots.Add(new Snapshot(userInitiated));
             UpdateRestoreChoicesInMenu();
         }
 
@@ -318,7 +318,7 @@ namespace WindowsLayoutSnapshot
 
         private void trayIcon_MouseClick(object sender, MouseEventArgs e)
         {
-            m_menuShownSnapshot = Snapshot.TakeSnapshot(false);
+            m_menuShownSnapshot = new Snapshot(false);
             justNowToolStripMenuItem.Tag = m_menuShownSnapshot;
 
             // the context menu won't show by default on left clicks.  we're going to have to ask it to show up.

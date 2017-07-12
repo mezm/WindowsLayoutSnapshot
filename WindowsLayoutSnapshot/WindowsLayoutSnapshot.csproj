@@ -47,6 +47,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Persistence\FileSnapshotStorage.cs" />
+    <Compile Include="Persistence\ISnapshotStorage.cs" />
     <Compile Include="Snapshot.cs" />
     <Compile Include="TrayIconForm.cs">
       <SubType>Form</SubType>
@@ -56,6 +58,11 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="WinApiInterop\DeferWindowPosCommands.cs" />
+    <Compile Include="WinApiInterop\GetAncestorFlags.cs" />
+    <Compile Include="WinApiInterop\Rect.cs" />
+    <Compile Include="WinApiInterop\WinApi.cs" />
+    <Compile Include="WinApiInterop\WindowPlacement.cs" />
     <Compile Include="Window.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
