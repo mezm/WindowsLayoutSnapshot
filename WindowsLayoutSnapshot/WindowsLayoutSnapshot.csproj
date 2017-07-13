@@ -58,9 +58,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Entities\WindowReference.cs" />
     <Compile Include="Persistence\FileSnapshotStorage.cs" />
     <Compile Include="Persistence\ISnapshotStorage.cs" />
-    <Compile Include="Snapshot.cs" />
+    <Compile Include="Entities\Snapshot.cs" />
     <Compile Include="TrayIconForm.cs">
       <SubType>Form</SubType>
     </Compile>

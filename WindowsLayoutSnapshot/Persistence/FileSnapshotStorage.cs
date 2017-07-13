@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using WindowsLayoutSnapshot.Entities;
 using Jil;
 
 namespace WindowsLayoutSnapshot.Persistence

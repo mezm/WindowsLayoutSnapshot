@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using WindowsLayoutSnapshot.Entities;
 
 namespace WindowsLayoutSnapshot.Persistence
 {

@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using WindowsLayoutSnapshot.WinApiInterop;
 
-namespace WindowsLayoutSnapshot
+namespace WindowsLayoutSnapshot.Entities
 {
     public class Snapshot : IEquatable<Snapshot>
     {

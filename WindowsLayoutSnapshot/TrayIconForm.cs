@@ -6,6 +6,7 @@ using System.Drawing.Imaging;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using WindowsLayoutSnapshot.Entities;
 using WindowsLayoutSnapshot.Persistence;
 
 namespace WindowsLayoutSnapshot

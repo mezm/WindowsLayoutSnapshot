@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using WindowsLayoutSnapshot.Entities;
 using WindowsLayoutSnapshot.Persistence;
 using FluentAssertions;
 using Xunit;
