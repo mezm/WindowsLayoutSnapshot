@@ -76,7 +76,6 @@
     <Compile Include="WinApiInterop\WinApi.cs" />
     <Compile Include="WinApiInterop\WinApiExtensions.cs" />
     <Compile Include="WinApiInterop\WindowPlacement.cs" />
-    <Compile Include="Window.cs" />
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
