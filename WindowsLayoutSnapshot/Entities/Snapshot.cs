@@ -9,7 +9,7 @@ namespace WindowsLayoutSnapshot.Entities
 {
     public class Snapshot : IEquatable<Snapshot>
     {
-        private readonly Dictionary<IntPtr, WindowPlacement> m_placements = new Dictionary<IntPtr, WindowPlacement>();
+        private readonly Dictionary<WindowReference, WindowPlacement> m_placements = new Dictionary<WindowReference, WindowPlacement>();
         private List<IntPtr> m_windowsBackToTop = new List<IntPtr>();
 
         // for deserialization
@@ -49,8 +49,8 @@ namespace WindowsLayoutSnapshot.Entities
             {
                 throw new Exception("Error getting window placement");
             }
-            m_placements.Add(hwnd, placement);
-
+            m_placements.Add(new WindowReference(hwnd), placement);
+            
             return true;
         }
 
@@ -95,12 +95,12 @@ namespace WindowsLayoutSnapshot.Entities
                 var placementValue = placement.Value;
 
                 // make sure points and rects will be inside monitor
-                var extendedStyles = GetWindowLongPtr(placement.Key, -20); // GWL_EXSTYLE
+                var extendedStyles = GetWindowLongPtr(placement.Key.Handler, -20); // GWL_EXSTYLE
                 placementValue.ptMaxPosition = GetUpperLeftCornerOfNearestMonitor(extendedStyles, placementValue.ptMaxPosition);
                 placementValue.ptMinPosition = GetUpperLeftCornerOfNearestMonitor(extendedStyles, placementValue.ptMinPosition);
                 placementValue.rcNormalPosition = GetRectInsideNearestMonitor(extendedStyles, placementValue.rcNormalPosition);
 
-                WinApi.SetWindowPlacement(placement.Key, ref placementValue);
+                WinApi.SetWindowPlacement(placement.Key.Handler, ref placementValue);
             }
 
             // now update the z-orders
