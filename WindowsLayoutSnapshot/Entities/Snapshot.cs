@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using WindowsLayoutSnapshot.WinApiInterop;
@@ -22,14 +23,8 @@ namespace WindowsLayoutSnapshot.Entities
             WinApi.EnumWindows(EvalWindow, 0);
             
             UserInitiated = userInitiated;
-
-            var pixels = new List<long>();
-            foreach (var screen in Screen.AllScreens)
-            {
-                pixels.Add(screen.Bounds.Width * screen.Bounds.Height);
-            }
-            MonitorPixelCounts = pixels.ToArray();
-            NumMonitors = pixels.Count;
+            MonitorPixelCounts = Screen.AllScreens.Select(screen => (long)screen.Bounds.Width * screen.Bounds.Height).ToArray();
+            NumMonitors = MonitorPixelCounts.Length;
         }
 
         private bool EvalWindow(int hwndInt, int lParam)
@@ -47,7 +42,7 @@ namespace WindowsLayoutSnapshot.Entities
             var placement = new WindowPlacement { length = Marshal.SizeOf(typeof(WindowPlacement)) };
             if (!WinApi.GetWindowPlacement(hwnd, ref placement))
             {
-                throw new Exception("Error getting window placement");
+                throw new Exception("Error getting window placement"); // todo: don't use generic exception
             }
             m_placements.Add(new WindowReference(hwnd), placement);
             
@@ -81,7 +76,7 @@ namespace WindowsLayoutSnapshot.Entities
                 // This was determined by trying a bunch of stuff
                 // This prevents the tray menu from closing, and makes sure it's still on top
                 WinApi.SetForegroundWindow(currentForegroundWindow);
-                TrayIconForm.me.Visible = true;
+                TrayIconForm.TrayMenu.Visible = true;
             }
         }
 
@@ -95,7 +90,7 @@ namespace WindowsLayoutSnapshot.Entities
                 var placementValue = placement.Value;
 
                 // make sure points and rects will be inside monitor
-                var extendedStyles = GetWindowLongPtr(placement.Key.Handler, -20); // GWL_EXSTYLE
+                var extendedStyles = placement.Key.Handler.GetWindowLongPointer();
                 placementValue.ptMaxPosition = GetUpperLeftCornerOfNearestMonitor(extendedStyles, placementValue.ptMaxPosition);
                 placementValue.ptMinPosition = GetUpperLeftCornerOfNearestMonitor(extendedStyles, placementValue.ptMinPosition);
                 placementValue.rcNormalPosition = GetRectInsideNearestMonitor(extendedStyles, placementValue.rcNormalPosition);
@@ -133,14 +128,14 @@ namespace WindowsLayoutSnapshot.Entities
             var rectAsRectangle = new Rectangle(rect.Left, rect.Top, width, height);
             var monitorRect = (windowExtendedStyles.ToInt64() & 0x00000080) > 0 ? Screen.GetBounds(rectAsRectangle) : Screen.GetWorkingArea(rectAsRectangle);
 
-            var y = new Rect
+            var result = new Rect
             {
                 Left = Math.Max(monitorRect.Left, Math.Min(monitorRect.Right - width, rect.Left)),
                 Top = Math.Max(monitorRect.Top, Math.Min(monitorRect.Bottom - height, rect.Top))
             };
-            y.Right = y.Left + Math.Min(monitorRect.Width, width);
-            y.Bottom = y.Top + Math.Min(monitorRect.Height, height);
-            return y;
+            result.Right = result.Left + Math.Min(monitorRect.Width, width);
+            result.Bottom = result.Top + Math.Min(monitorRect.Height, height);
+            return result;
         }
 
         private static bool IsAltTabWindow(IntPtr hwnd)
@@ -150,7 +145,7 @@ namespace WindowsLayoutSnapshot.Entities
                 return false;
             }
 
-            var extendedStyles = GetWindowLongPtr(hwnd, (-20)); // GWL_EXSTYLE
+            var extendedStyles = hwnd.GetWindowLongPointer();
             if ((extendedStyles.ToInt64() & 0x00040000) > 0)
             {
                 // WS_EX_APPWINDOW
@@ -176,8 +171,6 @@ namespace WindowsLayoutSnapshot.Entities
             
             return hwndWalk == hwnd;
         }
-
-        private static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex) => IntPtr.Size == 8 ? WinApi.GetWindowLongPtr64(hWnd, nIndex) : WinApi.GetWindowLongPtr32(hWnd, nIndex);
 
         public bool Equals(Snapshot other)
         {
