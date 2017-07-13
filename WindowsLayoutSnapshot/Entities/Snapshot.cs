@@ -5,16 +5,16 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using WindowsLayoutSnapshot.WinApiInterop;
+using Jil;
 
 namespace WindowsLayoutSnapshot.Entities
 {
     public class Snapshot : IEquatable<Snapshot>
     {
-        private readonly Dictionary<WindowReference, WindowPlacement> m_placements = new Dictionary<WindowReference, WindowPlacement>();
         private List<IntPtr> m_windowsBackToTop = new List<IntPtr>();
 
         // for deserialization
-        protected Snapshot()
+        private Snapshot()
         {
         }
 
@@ -23,39 +23,21 @@ namespace WindowsLayoutSnapshot.Entities
             WinApi.EnumWindows(EvalWindow, 0);
             
             UserInitiated = userInitiated;
-            MonitorPixelCounts = Screen.AllScreens.Select(screen => (long)screen.Bounds.Width * screen.Bounds.Height).ToArray();
+            MonitorPixelCounts = Screen.AllScreens.Select(screen => (long) screen.Bounds.Width * screen.Bounds.Height).ToArray();
             NumMonitors = MonitorPixelCounts.Length;
         }
 
-        private bool EvalWindow(int hwndInt, int lParam)
-        {
-            var hwnd = new IntPtr(hwndInt);
+        public List<WindowReference> Windows { get; private set; } = new List<WindowReference>();
 
-            if (!IsAltTabWindow(hwnd))
-            {
-                return true;
-            }
+        public Guid Id { get; private set; } = Guid.NewGuid();
+        public DateTime TimeTaken { get; private set; } = DateTime.UtcNow;
+        public bool UserInitiated { get; private set; }
+        public long[] MonitorPixelCounts { get; private set; }
+        public int NumMonitors { get; private set; }
 
-            // EnumWindows returns windows in Z order from back to front
-            m_windowsBackToTop.Add(hwnd);
-
-            var placement = new WindowPlacement { length = Marshal.SizeOf(typeof(WindowPlacement)) };
-            if (!WinApi.GetWindowPlacement(hwnd, ref placement))
-            {
-                throw new Exception("Error getting window placement"); // todo: don't use generic exception
-            }
-            m_placements.Add(new WindowReference(hwnd), placement);
-            
-            return true;
-        }
-
-        public Guid Id { get; protected set; } = Guid.NewGuid();
-        public DateTime TimeTaken { get; protected set; } = DateTime.UtcNow;
-        public bool UserInitiated { get; protected set; }
-        public long[] MonitorPixelCounts { get; protected set; }
-        public int NumMonitors { get; protected set; }
-
+        [JilDirective(Ignore = true)]
         public TimeSpan Age => DateTime.UtcNow.Subtract(TimeTaken);
+
 
         public void RestoreAndPreserveMenu(object sender, EventArgs e)
         {
@@ -84,18 +66,18 @@ namespace WindowsLayoutSnapshot.Entities
         {
             // ignore extra params
             // first, restore the window rectangles and normal/maximized/minimized states
-            foreach (var placement in m_placements)
+            foreach (var window in Windows)
             {
                 // this might error out if the window no longer exists
-                var placementValue = placement.Value;
+                var placementValue = window.Placement;
 
                 // make sure points and rects will be inside monitor
-                var extendedStyles = placement.Key.Handler.GetWindowLongPointer();
+                var extendedStyles = window.Handler.GetWindowLongPointer();
                 placementValue.ptMaxPosition = GetUpperLeftCornerOfNearestMonitor(extendedStyles, placementValue.ptMaxPosition);
                 placementValue.ptMinPosition = GetUpperLeftCornerOfNearestMonitor(extendedStyles, placementValue.ptMinPosition);
                 placementValue.rcNormalPosition = GetRectInsideNearestMonitor(extendedStyles, placementValue.rcNormalPosition);
 
-                WinApi.SetWindowPlacement(placement.Key.Handler, ref placementValue);
+                WinApi.SetWindowPlacement(window.Handler, ref placementValue);
             }
 
             // now update the z-orders
@@ -103,7 +85,8 @@ namespace WindowsLayoutSnapshot.Entities
             var positionStructure = WinApi.BeginDeferWindowPos(m_windowsBackToTop.Count);
             for (var i = 0; i < m_windowsBackToTop.Count; i++)
             {
-                positionStructure = WinApi.DeferWindowPos(positionStructure,
+                positionStructure = WinApi.DeferWindowPos(
+                    positionStructure,
                     m_windowsBackToTop[i],
                     i == 0 ? IntPtr.Zero : m_windowsBackToTop[i - 1],
                     0,
@@ -113,6 +96,28 @@ namespace WindowsLayoutSnapshot.Entities
                     DeferWindowPosCommands.SWP_NOMOVE | DeferWindowPosCommands.SWP_NOSIZE | DeferWindowPosCommands.SWP_NOACTIVATE);
             }
             WinApi.EndDeferWindowPos(positionStructure);
+        }
+
+        private bool EvalWindow(int hwndInt, int lParam)
+        {
+            var hwnd = new IntPtr(hwndInt);
+
+            if (!IsAltTabWindow(hwnd))
+            {
+                return true;
+            }
+
+            // EnumWindows returns windows in Z order from back to front
+            m_windowsBackToTop.Add(hwnd);
+
+            var placement = new WindowPlacement { length = Marshal.SizeOf(typeof(WindowPlacement)) };
+            if (!WinApi.GetWindowPlacement(hwnd, ref placement))
+            {
+                throw new Exception("Error getting window placement"); // todo: don't use generic exception
+            }
+            Windows.Add(new WindowReference(hwnd, placement));
+            
+            return true;
         }
 
         private static Point GetUpperLeftCornerOfNearestMonitor(IntPtr windowExtendedStyles, Point point)

@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using WindowsLayoutSnapshot.WinApiInterop;
+using Jil;
 
 namespace WindowsLayoutSnapshot.Entities
 {
@@ -11,18 +12,23 @@ namespace WindowsLayoutSnapshot.Entities
         // for deserialization
         private WindowReference()
         {
+            // todo: find handler
         }
 
-        public WindowReference(IntPtr handler)
+        public WindowReference(IntPtr handler, WindowPlacement placement)
         {
             Handler = handler;
+            Placement = placement;
             ProcessFilePath = GetProcessPath();
             Title = GetWindowTitle();
         }
 
-        public IntPtr Handler { get; set; }
-        public string ProcessFilePath { get; set; }
-        public string Title { get; set; }
+        [JilDirective(Ignore = true)]
+        public IntPtr Handler { get; private set; }
+
+        public string ProcessFilePath { get; private set; }
+        public string Title { get; private set; }
+        public WindowPlacement Placement { get; private set; }
 
         private string GetProcessPath()
         {
@@ -30,9 +36,9 @@ namespace WindowsLayoutSnapshot.Entities
 
             WinApi.GetWindowThreadProcessId(Handler, out var processId);
             if (processId == 0) return string.Empty;
-            
+
             try
-            {    
+            {
                 var process = Process.GetProcessById((int) processId);
                 return process.MainModule.FileName;
             }
@@ -44,7 +50,7 @@ namespace WindowsLayoutSnapshot.Entities
             {
                 // The process was not started by this object.
             }
-            catch (Win32Exception ex) when(ex.NativeErrorCode == 5) 
+            catch (Win32Exception ex) when (ex.NativeErrorCode == 5)
             {
                 // Access denied
             }
@@ -56,7 +62,7 @@ namespace WindowsLayoutSnapshot.Entities
         {
             var length = WinApi.GetWindowTextLength(Handler);
             if (length == 0) return string.Empty;
-            
+
             var title = new StringBuilder(length);
             WinApi.GetWindowText(Handler, title, length + 1);
             return title.ToString();
