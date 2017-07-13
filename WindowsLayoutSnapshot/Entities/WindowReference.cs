@@ -10,25 +10,31 @@ namespace WindowsLayoutSnapshot.Entities
     public class WindowReference : IEquatable<WindowReference>
     {
         // for deserialization
+        // ReSharper disable once UnusedMember.Local
         private WindowReference()
         {
             // todo: find handler
         }
 
-        public WindowReference(IntPtr handler, WindowPlacement placement)
+        public WindowReference(IntPtr handler, WindowPlacement placement, int zOrder)
         {
             Handler = handler;
             Placement = placement;
+            ZOrder = zOrder;
             ProcessFilePath = GetProcessPath();
             Title = GetWindowTitle();
         }
 
         [JilDirective(Ignore = true)]
-        public IntPtr Handler { get; private set; }
-
+        public IntPtr Handler { get; }
+        
+        // for deserialization
+        // ReSharper disable AutoPropertyCanBeMadeGetOnly.Local
         public string ProcessFilePath { get; private set; }
         public string Title { get; private set; }
         public WindowPlacement Placement { get; private set; }
+        public int ZOrder { get; private set; }
+        // ReSharper restore AutoPropertyCanBeMadeGetOnly.Local
 
         private string GetProcessPath()
         {
@@ -79,7 +85,7 @@ namespace WindowsLayoutSnapshot.Entities
         {
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != this.GetType()) return false;
+            if (obj.GetType() != GetType()) return false;
             return Equals((WindowReference) obj);
         }
 

@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using WindowsLayoutSnapshot.WinApiInterop;
 using Jil;
@@ -11,33 +9,35 @@ namespace WindowsLayoutSnapshot.Entities
 {
     public class Snapshot : IEquatable<Snapshot>
     {
-        private List<IntPtr> m_windowsBackToTop = new List<IntPtr>();
-
         // for deserialization
+        // ReSharper disable once UnusedMember.Local
         private Snapshot()
         {
         }
 
-        public Snapshot(bool userInitiated)
+        public Snapshot(bool userInitiated, long[] monitorPixelCounts, WindowReference[] windows)
         {
-            WinApi.EnumWindows(EvalWindow, 0);
-            
+            Id = Guid.NewGuid();
+            TimeTaken = DateTime.UtcNow;
             UserInitiated = userInitiated;
-            MonitorPixelCounts = Screen.AllScreens.Select(screen => (long) screen.Bounds.Width * screen.Bounds.Height).ToArray();
-            NumMonitors = MonitorPixelCounts.Length;
+            MonitorPixelCounts = monitorPixelCounts;
+            Windows = windows;
         }
 
-        public List<WindowReference> Windows { get; private set; } = new List<WindowReference>();
-
-        public Guid Id { get; private set; } = Guid.NewGuid();
-        public DateTime TimeTaken { get; private set; } = DateTime.UtcNow;
+        // for deserialization
+        // ReSharper disable AutoPropertyCanBeMadeGetOnly.Local
+        public Guid Id { get; private set; }
+        public DateTime TimeTaken { get; private set; } 
         public bool UserInitiated { get; private set; }
         public long[] MonitorPixelCounts { get; private set; }
-        public int NumMonitors { get; private set; }
+        public WindowReference[] Windows { get; private set; }
+        // ReSharper restore AutoPropertyCanBeMadeGetOnly.Local
 
         [JilDirective(Ignore = true)]
         public TimeSpan Age => DateTime.UtcNow.Subtract(TimeTaken);
 
+        [JilDirective(Ignore = true)]
+        public int NumberOfMonitors => MonitorPixelCounts.Length;
 
         public void RestoreAndPreserveMenu(object sender, EventArgs e)
         {
@@ -81,14 +81,14 @@ namespace WindowsLayoutSnapshot.Entities
             }
 
             // now update the z-orders
-            m_windowsBackToTop = m_windowsBackToTop.FindAll(WinApi.IsWindowVisible);
-            var positionStructure = WinApi.BeginDeferWindowPos(m_windowsBackToTop.Count);
-            for (var i = 0; i < m_windowsBackToTop.Count; i++)
+            var windowsBackToTop = Windows.Where(x => WinApi.IsWindowVisible(x.Handler)).ToArray();
+            var positionStructure = WinApi.BeginDeferWindowPos(windowsBackToTop.Length);
+            for (var i = 0; i < windowsBackToTop.Length; i++)
             {
                 positionStructure = WinApi.DeferWindowPos(
                     positionStructure,
-                    m_windowsBackToTop[i],
-                    i == 0 ? IntPtr.Zero : m_windowsBackToTop[i - 1],
+                    windowsBackToTop[i].Handler,
+                    i == 0 ? IntPtr.Zero : windowsBackToTop[i - 1].Handler,
                     0,
                     0,
                     0,
@@ -96,28 +96,6 @@ namespace WindowsLayoutSnapshot.Entities
                     DeferWindowPosCommands.SWP_NOMOVE | DeferWindowPosCommands.SWP_NOSIZE | DeferWindowPosCommands.SWP_NOACTIVATE);
             }
             WinApi.EndDeferWindowPos(positionStructure);
-        }
-
-        private bool EvalWindow(int hwndInt, int lParam)
-        {
-            var hwnd = new IntPtr(hwndInt);
-
-            if (!IsAltTabWindow(hwnd))
-            {
-                return true;
-            }
-
-            // EnumWindows returns windows in Z order from back to front
-            m_windowsBackToTop.Add(hwnd);
-
-            var placement = new WindowPlacement { length = Marshal.SizeOf(typeof(WindowPlacement)) };
-            if (!WinApi.GetWindowPlacement(hwnd, ref placement))
-            {
-                throw new Exception("Error getting window placement"); // todo: don't use generic exception
-            }
-            Windows.Add(new WindowReference(hwnd, placement));
-            
-            return true;
         }
 
         private static Point GetUpperLeftCornerOfNearestMonitor(IntPtr windowExtendedStyles, Point point)
@@ -143,40 +121,6 @@ namespace WindowsLayoutSnapshot.Entities
             return result;
         }
 
-        private static bool IsAltTabWindow(IntPtr hwnd)
-        {
-            if (!WinApi.IsWindowVisible(hwnd))
-            {
-                return false;
-            }
-
-            var extendedStyles = hwnd.GetWindowLongPointer();
-            if ((extendedStyles.ToInt64() & 0x00040000) > 0)
-            {
-                // WS_EX_APPWINDOW
-                return true;
-            }
-            if ((extendedStyles.ToInt64() & 0x00000080) > 0)
-            {
-                // WS_EX_TOOLWINDOW
-                return false;
-            }
-
-            var hwndTry = WinApi.GetAncestor(hwnd, GetAncestorFlags.GetRootOwner);
-            var hwndWalk = IntPtr.Zero;
-            while (hwndTry != hwndWalk)
-            {
-                hwndWalk = hwndTry;
-                hwndTry = WinApi.GetLastActivePopup(hwndWalk);
-                if (WinApi.IsWindowVisible(hwndTry))
-                {
-                    break;
-                }
-            }
-            
-            return hwndWalk == hwnd;
-        }
-
         public bool Equals(Snapshot other)
         {
             if (ReferenceEquals(null, other)) return false;
@@ -188,10 +132,12 @@ namespace WindowsLayoutSnapshot.Entities
         {
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != this.GetType()) return false;
+            if (obj.GetType() != GetType()) return false;
             return Equals((Snapshot) obj);
         }
 
+        // Id is been initialized only once, but can be not in constructor
+        // ReSharper disable once NonReadonlyMemberInGetHashCode
         public override int GetHashCode() => Id.GetHashCode();
     }
 }

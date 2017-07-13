@@ -62,6 +62,8 @@
     <Compile Include="Persistence\FileSnapshotStorage.cs" />
     <Compile Include="Persistence\ISnapshotStorage.cs" />
     <Compile Include="Entities\Snapshot.cs" />
+    <Compile Include="Snapshots\CurrentSnapshotFactory.cs" />
+    <Compile Include="Snapshots\ICurrentSnapshotFactory.cs" />
     <Compile Include="TrayIconForm.cs">
       <SubType>Form</SubType>
     </Compile>

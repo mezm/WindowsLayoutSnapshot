@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using WindowsLayoutSnapshot.Entities;
 using WindowsLayoutSnapshot.Persistence;
+using WindowsLayoutSnapshot.Tests.Utils;
 using FluentAssertions;
 using Xunit;
 
@@ -49,7 +50,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]
         public async Task AddSnapshot_NoSnapshots_ShouldAddOne()
         {
-            var snapshot = new Snapshot(true);
+            var snapshot = SnapshotUtils.MakeOne();
 
             await _storage.AddSnapshot(snapshot);
 
@@ -59,9 +60,9 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]
         public async Task AddSnapshot_FewSnapshotsAdded_ShouldAddOneToTheEnd()
         {
-            var snapshot1 = new Snapshot(true);
-            var snapshot2 = new Snapshot(true);
-            var snapshot3 = new Snapshot(true);
+            var snapshot1 = SnapshotUtils.MakeOne();
+            var snapshot2 = SnapshotUtils.MakeAnotherOne();
+            var snapshot3 = SnapshotUtils.MakeYetAnotherOne();
 
             await _storage.AddSnapshot(snapshot1);
             await _storage.AddSnapshot(snapshot2);
@@ -73,7 +74,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]
         public async Task AddSnapshot_FewSnapshotsAddedConcurent_ShouldAddAll()
         {
-            var snapshots = Enumerable.Range(0, 10).Select(_ => new Snapshot(true)).ToArray();
+            var snapshots = Enumerable.Range(0, 10).Select(_ => SnapshotUtils.MakeOne()).ToArray();
 
             await Task.WhenAll(snapshots.Select(x => _storage.AddSnapshot(x)));
 
@@ -84,8 +85,8 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]
         public async Task AddSnapshot_SnapshotsAlreadyAdded_ShouldThrow()
         {
-            var snapshot = new Snapshot(true);
-            
+            var snapshot = SnapshotUtils.MakeOne();
+
             await _storage.AddSnapshot(snapshot);
 
             _storage.Invoking(x => x.AddSnapshot(snapshot).Wait()).ShouldThrow<InvalidOperationException>();
@@ -94,7 +95,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]
         public async Task AddSnapshot_RestoreMode_ShouldRestorePrevState()
         {
-            var snapshots = Enumerable.Range(0, 10).Select(_ => new Snapshot(true)).ToArray();
+            var snapshots = Enumerable.Range(0, 10).Select(_ => SnapshotUtils.MakeOne()).ToArray();
 
             await Task.WhenAll(snapshots.Select(x => _storage.AddSnapshot(x)));
 
@@ -108,7 +109,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         {
             File.WriteAllText(FileSnapshotStorage.SnapshotsFilename, @"{'a': 10}");
 
-            await _storage.AddSnapshot(new Snapshot(true));
+            await _storage.AddSnapshot(SnapshotUtils.MakeOne());
 
             _storage.Dispose();
             File.Exists(FileSnapshotStorage.SnapshotsFilename).Should().BeTrue();
@@ -118,9 +119,9 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]  
         public async Task RemoveSnapshot_SnapshotExists_ShouldRemoveOne()
         {
-            var snapshot1 = new Snapshot(true);
-            var snapshot2 = new Snapshot(true);
-            var snapshot3 = new Snapshot(true);
+            var snapshot1 = SnapshotUtils.MakeOne();
+            var snapshot2 = SnapshotUtils.MakeAnotherOne();
+            var snapshot3 = SnapshotUtils.MakeYetAnotherOne();
 
             await _storage.AddSnapshot(snapshot1);
             await _storage.AddSnapshot(snapshot2);
@@ -134,7 +135,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]
         public async Task RemoveSnapshot_SnapshotExistsConcurently_ShouldRemoveOne()
         {
-            var snapshots = Enumerable.Range(0, 30).Select(_ => new Snapshot(true)).ToArray();
+            var snapshots = Enumerable.Range(0, 30).Select(_ => SnapshotUtils.MakeOne()).ToArray();
             await Task.WhenAll(snapshots.Select(x => _storage.AddSnapshot(x)));
 
             var removed = new[] { 3, 21, 12, 13, 7 }.Select(x => snapshots[x]).ToArray();
@@ -146,9 +147,9 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]
         public async Task RemoveSnapshot_SnapshotNotExists_ShouldThrow()
         {
-            var snapshot1 = new Snapshot(true);
-            var snapshot2 = new Snapshot(true);
-            var snapshot3 = new Snapshot(true);
+            var snapshot1 = SnapshotUtils.MakeOne();
+            var snapshot2 = SnapshotUtils.MakeAnotherOne();
+            var snapshot3 = SnapshotUtils.MakeYetAnotherOne();
 
             await _storage.AddSnapshot(snapshot1);
             await _storage.AddSnapshot(snapshot3);
@@ -159,7 +160,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]
         public async Task RemoveSnapshot_RestoreMode_ShouldRestorePrevState()
         {
-            var snapshots = Enumerable.Range(0, 30).Select(_ => new Snapshot(true)).ToArray();
+            var snapshots = Enumerable.Range(0, 30).Select(_ => SnapshotUtils.MakeOne()).ToArray();
 
             await Task.WhenAll(snapshots.Select(x => _storage.AddSnapshot(x)));
 
@@ -182,7 +183,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         public async Task Clear_FewSnapshots_ShouldClear()
         {
             // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
-            Enumerable.Range(0, 10).Select(_ => new Snapshot(true)).ToArray();
+            Enumerable.Range(0, 10).Select(_ => SnapshotUtils.MakeOne()).ToArray();
 
             await _storage.Clear();
 
@@ -192,7 +193,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]
         public async Task Clear_RestoreMode_ShouldRestorePrevState()
         {
-            var snapshots = Enumerable.Range(0, 30).Select(_ => new Snapshot(true)).ToArray();
+            var snapshots = Enumerable.Range(0, 30).Select(_ => SnapshotUtils.MakeOne()).ToArray();
 
             await Task.WhenAll(snapshots.Select(x => _storage.AddSnapshot(x)));
 
@@ -204,8 +205,8 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         [Fact]
         public async Task AddAndRemove_Concurently_ShouldHaveCorrectState()
         {
-            var snapshots = Enumerable.Range(0, 30).Select(_ => new Snapshot(true)).ToArray();
-            var newSnapshot = new Snapshot(true);
+            var snapshots = Enumerable.Range(0, 30).Select(_ => SnapshotUtils.MakeOne()).ToArray();
+            var newSnapshot = SnapshotUtils.MakeYetAnotherOne(); 
 
             await Task.WhenAll(snapshots.Select(x => _storage.AddSnapshot(x)));
             
@@ -226,7 +227,7 @@ namespace WindowsLayoutSnapshot.Tests.Persistence
         {
             using (new FileStream(FileSnapshotStorage.SnapshotsFilename, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None))
             {
-                _storage.Invoking(x => x.AddSnapshot(new Snapshot(true))).ShouldThrow<IOException>();
+                _storage.Invoking(x => x.AddSnapshot(SnapshotUtils.MakeOne())).ShouldThrow<IOException>();
             }
         }
         

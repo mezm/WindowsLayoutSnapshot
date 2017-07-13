@@ -8,14 +8,17 @@ using System.Reflection;
 using System.Windows.Forms;
 using WindowsLayoutSnapshot.Entities;
 using WindowsLayoutSnapshot.Persistence;
+using WindowsLayoutSnapshot.Snapshots;
 using WindowsLayoutSnapshot.WinApiInterop;
 
 namespace WindowsLayoutSnapshot
 {
     public partial class TrayIconForm : Form
     {
+        private readonly ISnapshotStorage _snapshots = new FileSnapshotStorage();
+        private readonly ICurrentSnapshotFactory _snapshotFactory = new CurrentSnapshotFactory();
+        
         private readonly Timer m_snapshotTimer = new Timer();
-        private readonly ISnapshotStorage m_snapshots = new FileSnapshotStorage();
         private Snapshot m_menuShownSnapshot;
         private Padding? m_originalTrayMenuArrowPadding;
         private Padding? m_originalTrayMenuTextPadding;
@@ -38,7 +41,8 @@ namespace WindowsLayoutSnapshot
         
         private void TakeSnapshot(bool userInitiated)
         {
-            m_snapshots.AddSnapshot(new Snapshot(userInitiated));
+            var snapshot = _snapshotFactory.TakeSnapshot(userInitiated);
+            _snapshots.AddSnapshot(snapshot);
             UpdateRestoreChoicesInMenu();
         }
 
@@ -47,7 +51,7 @@ namespace WindowsLayoutSnapshot
             // construct the new list of menu items, then populate them
             // this function is idempotent
 
-            var snapshotsOldestFirst = new List<Snapshot>(CondenseSnapshots(m_snapshots.AllSnapshots, 20));
+            var snapshotsOldestFirst = new List<Snapshot>(CondenseSnapshots(_snapshots.AllSnapshots, 20));
             var newMenuItems = new List<ToolStripItem> { quitToolStripMenuItem, snapshotListEndLine };
             
             var maxNumMonitors = 0;
@@ -55,12 +59,12 @@ namespace WindowsLayoutSnapshot
             var showMonitorIcons = false;
             foreach (var snapshot in snapshotsOldestFirst)
             {
-                if (maxNumMonitors != snapshot.NumMonitors && maxNumMonitors != 0)
+                if (maxNumMonitors != snapshot.NumberOfMonitors && maxNumMonitors != 0)
                 {
                     showMonitorIcons = true;
                 }
 
-                maxNumMonitors = Math.Max(maxNumMonitors, snapshot.NumMonitors);
+                maxNumMonitors = Math.Max(maxNumMonitors, snapshot.NumberOfMonitors);
                 maxNumMonitorPixels = snapshot.MonitorPixelCounts.Concat(new[] { maxNumMonitorPixels }).Max();
             }
 
@@ -241,7 +245,7 @@ namespace WindowsLayoutSnapshot
 
         private void OnTrayIconMouseClick(object sender, MouseEventArgs e)
         {
-            m_menuShownSnapshot = new Snapshot(false);
+            m_menuShownSnapshot = _snapshotFactory.TakeSnapshot(false);
             justNowToolStripMenuItem.Tag = m_menuShownSnapshot;
 
             // the context menu won't show by default on left clicks.  we're going to have to ask it to show up.
@@ -275,7 +279,7 @@ namespace WindowsLayoutSnapshot
 
         private void OnClearSnapshotsToolStripMenuItemClick(object sender, EventArgs e)
         {
-            m_snapshots.Clear();
+            _snapshots.Clear();
             UpdateRestoreChoicesInMenu();
         }
 
